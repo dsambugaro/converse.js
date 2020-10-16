@@ -1,8 +1,10 @@
 import URI from "urijs";
 import log from '@converse/headless/log';
+import tpl_message_styling from '../message_styling.js';
 import { _converse, api, converse } from  "@converse/headless/converse-core";
 import { convertASCII2Emoji, getEmojiMarkup, getCodePointReferences, getShortnameReferences } from "@converse/headless/converse-emoji.js";
 import { directive, html } from "lit-html";
+import { getMessageStylingReferences } from "@converse/headless/utils/parse-helpers";
 import { until } from 'lit-html/directives/until.js';
 
 const u = converse.env.utils;
@@ -88,6 +90,10 @@ class MessageText extends String {
     }
 }
 
+function addStylingReferences(text) {
+    const refs = getMessageStylingReferences(text);
+    refs.forEach((ref) => text.addTemplateResult(ref.begin, ref.end, tpl_message_styling({'html':ref.html})));
+}
 
 function addMapURLs (text) {
     const regex = /geo:([\-0-9.]+),([\-0-9.]+)(?:,([\-0-9.]+))?(?:\?(.*))?/g;
@@ -202,7 +208,7 @@ class MessageBodyRenderer {
         addMapURLs(text);
         await addEmojis(text);
         addReferences(text, this.model);
-
+        addStylingReferences(text);
         /**
          * Synchronous event which provides a hook for transforming a chat message's body text
          * after the default transformations have been applied.

@@ -41,3 +41,90 @@ const reduceReferences = ([text, refs], ref, index) => {
 helpers.reduceTextFromReferences = (text, refs) => refs.reduce(reduceReferences, [text, []]);
 
 export default helpers;
+
+const styling_directives = ['*', '_', '~', '`', '```', '>'];
+const recursive_directives = ['*', '_', '~', '>'];
+const styling_map = {
+    '*': 'strong',
+    '_': 'emphasis',
+    '~': 'strike',
+    '`': 'preformatted',
+    '```': 'preformatted_block',
+    '>': 'quote'
+};
+
+const styling_templates = {
+    emphasis: (text) => `<i>${text}</i>`,
+    preformatted: (text) => `<code>${text}</code>`,
+    preformatted_block: (text) => `<div class="code_block">${text}</div>`,
+    quote: (text) => `<div class="quote">${text}</div>`,
+    strike: (text) => `<del>${text}</del>`,
+    strong: (text) => `<b>${text}</b>`,
+};
+
+
+function getStylingMarkup (text) {
+    let i = 0, html = '';
+    while (i < text.length) {
+        if (styling_directives.includes(text[i])) {
+            const begin = i;
+            const d = text[i]; // the styling directive
+            const template = styling_templates[styling_map[d]];
+            i++;
+            while (i < text.length && text[i] !== d) {
+                i++;
+            }
+
+            // TODO: don't let spans wrap \n
+            // TODO: Properly match preformatted blocks
+
+            if (i < text.length) {
+                if (d === '>') {
+                    // The only directive that doesn't have a closing tag
+                    html += `${d}${template(getStylingMarkup(text.slice(begin+1)))}`
+                } else if (recursive_directives.includes(d)) {
+                    html += `${d}${template(getStylingMarkup(text.slice(begin+1, i)))}${d}`
+                } else {
+                    html +=  `${d}${template(text.slice(begin+1, i))}${d}`
+                }
+            } else {
+                // We reached the end without finding a match
+                // Go back to original i and continue
+                i = begin;
+            }
+        } else {
+            html += text[i];
+        }
+        i++;
+    }
+    return html;
+}
+
+
+export function getMessageStylingReferences (message) {
+    let i = 0;
+    const references = [];
+    while (i < message.length) {
+        if (styling_directives.includes(message[i])) {
+            const begin = i;
+            const directive = message[i];
+            i++;
+            while (i < message.length && message[i] !== directive) {
+                i++;
+            }
+            if (i < message.length) {
+                references.push({
+                    begin,
+                    'end': i+1,
+                    'html': getStylingMarkup(message.slice(begin, i+1))
+                });
+            } else {
+                // We reached the end without finding a match
+                // Go back to original i and continue
+                i = begin;
+            }
+        }
+        i++;
+    }
+    return references;
+}
